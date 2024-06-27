@@ -1,34 +1,6 @@
 #!meta
 
-{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"languageName":"csharp","name":"csharp"}]}}
-
-#!markdown
-
-# Практическая работа №1. Знакомство с потоками.
-
-**Цель:** Познакомиться с возможностями класса System.Thread платформы .NET Framework.
-
-**Результаты:** После выполнения работы Вы сможете:
-1. Запускать длительные операции в отдельном потоке.
-2. Завершать поток.
-3. Дожидаться завершения выполнения потока. 
-
-
-**Материалы для самостоятельного изучения**.
-1. [Основы управления потоками](https://learn.microsoft.com/en-us/dotnet/standard/threading/managed-threading-basics)
-2. [Использование потоков](https://learn.microsoft.com/en-us/dotnet/standard/threading/using-threads-and-threading)
-3. [Примитив синхронизации Барьер](https://learn.microsoft.com/ru-ru/dotnet/standard/threading/barrier)
-4. [Interlocked операции](https://learn.microsoft.com/en-us/dotnet/api/system.threading.interlocked?view=net-8.0)
-
-## Задание.
-Реализовать вычисление определенного интеграла методом трапеции в несколько потоков.
-
-Отрезок, на котором происходит вычисление, разбивается на отрезки по количеству потоков. Для каждого отрезка значение 
-интеграла считается в отдельном потоке, после завершения вычисоения полученный рельтаты суммирутся.
-
-**Указание**.
-1. Для суммирования результатов удобно воспользоваться разделяемой переменной, к которой будут прибалятся результаты вычисления прямо в самом потоке. Для синхронизации операций сложения лучше всего восользоваться [Interlocked операцией](https://learn.microsoft.com/en-us/dotnet/api/system.threading.interlocked?view=net-8.0).
-2. Основная функция долна дождаться завершения всех потоков, которые вычисляют значение на отрезках, прежде чем возвратить результат. Для этого удобнее всего использовать Примитив синхронизации Барьер](https://learn.microsoft.com/ru-ru/dotnet/standard/threading/barrier).
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"}]}}
 
 #!csharp
 
@@ -165,7 +137,7 @@ var minTreadsCount = keyValuePairs
                     .OrderBy(pair => pair.Count)
                     .FirstOrDefault();
 
-Console.WriteLine($"\nBest count of threads: {minTreadsCount.Count}\tTicks: {minTreadsCount.Ticks}\t\tTicks in one tread: {totalTicksOne / tests}");
+Console.WriteLine($"\nBest count of threads: {minTreadsCount.Count} Ticks: {minTreadsCount.Ticks} Ticks in one tread: {totalTicksOne / tests}");
 Console.WriteLine($"The number of ticks for multithreads is {totalTicksOne / tests / minTreadsCount.Ticks} times less than for single streams");
 
 ScottPlot.Plot plt = new();
