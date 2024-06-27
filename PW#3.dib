@@ -32,6 +32,20 @@
 
 #!csharp
 
+#r "nuget: xunit, 2.8.1"
+#r "nuget:ScottPlot, 5.0.35"
+
+using System.Diagnostics;
+using Microsoft.DotNet.Interactive.Formatting;
+
+Stopwatch clockOneThread = new Stopwatch();
+Stopwatch clockMultuThread = new Stopwatch();
+
+Formatter.Register(typeof(ScottPlot.Plot), (p, w) => 
+    w.Write(((ScottPlot.Plot)p).GetImageHtml(1000, 800)), HtmlFormatter.MimeType);
+
+#!csharp
+
 using System.Threading;
 //
 // Вычисление определенного интеграла
@@ -58,23 +72,141 @@ class DefiniteIntegral
                 res += 2 * function(a + j * step);
             Interlocked.Exchange(ref result, (result + res));
         });
-        return Math.Round(result * (step / 2));
+        return result * (step / 2);
+    }
+
+    public static double SolveNoMulti(double a, double b, Func<double, double> function, double step)
+    {
+        int n = Convert.ToInt32((b - a) / step);
+
+        double result = function(a) + function(b);
+        for (int i = 0; i < n; i++)
+            result += 2 * function((double)(a + i * step));
+
+        return result * (step / 2);
     }
 }
 
 #!csharp
 
-#r "nuget: xunit, 2.8.1"
-
-#!csharp
+// Best step
 
 using Xunit;
 
-var X = (double x) => x;
 var SIN = (double x) => Math.Sin(x);
 
-Assert.Equal(0, DefiniteIntegral.Solve(-1, 1, X, 1e-4, 2), 1e-4);
+var (a, b) = (-100, 100);
+double[] steps = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6];
 
-Assert.Equal(0, DefiniteIntegral.Solve(-1, 1, SIN, 1e-5, 8), 1e-4);
+foreach (var step in steps)
+{
+    int countOfBadRes = 0;
+    foreach (var _ in Enumerable.Range(1, 5))
+    foreach (var threadsnumber in Enumerable.Range(2, 24))
+    {
+        try
+        {
+            Assert.Equal(0, DefiniteIntegral.Solve(a, b, SIN, step, threadsnumber), 1e-4);
+        }
+        catch
+        {
+            countOfBadRes++;
+        }
+    }
+    Console.WriteLine($"Step: {step}  Count of bad results: {countOfBadRes}");
+}
 
-Assert.Equal(50, DefiniteIntegral.Solve(0, 10, X, 1e-6, 8), 1e-5);
+#!csharp
+
+// Best count of threads (!!!2 MINS TOTAL TIME!!!)
+
+using Xunit;
+
+var SIN = (double x) => Math.Sin(x);
+
+var (a, b) = (-100, 100);
+double step = 1e-4;
+
+int tests = 50;
+
+float totalTicksOne = 0;
+foreach (var _ in Enumerable.Range(1, tests))
+{
+    clockOneThread.Start();
+    DefiniteIntegral.SolveNoMulti(a, b, SIN, step);
+    clockOneThread.Stop();
+    totalTicksOne += clockOneThread.ElapsedTicks;
+    clockOneThread.Reset();
+}
+
+List<float> dataX = [totalTicksOne / tests];
+List<int> dataY = [1];
+
+foreach (var threadsnumber in Enumerable.Range(2, 25))
+{
+    float totalTicks = 0;
+    foreach (var _ in Enumerable.Range(1, tests))
+    {
+        clockMultuThread.Start();
+        DefiniteIntegral.Solve(a, b, SIN, step, threadsnumber);
+        clockMultuThread.Stop();
+        totalTicks += clockMultuThread.ElapsedTicks;
+        clockMultuThread.Reset();
+    }
+    Console.WriteLine($"Threads: {threadsnumber}\tOneThread: {totalTicksOne / tests}\tMultiTreadTicksAVG: {totalTicks / tests}");
+    dataX.Add(totalTicks / tests);
+    dataY.Add(threadsnumber);
+}
+
+var keyValuePairs = dataY.Zip(dataX, (count, ticks) => new { Count = count, Ticks = ticks });
+
+var minTreadsCount = keyValuePairs
+                    .Where(pair => Math.Abs(pair.Ticks - keyValuePairs.Min(p => p.Ticks)) < 2500)
+                    .OrderBy(pair => pair.Count)
+                    .FirstOrDefault();
+
+Console.WriteLine($"\nBest count of threads: {minTreadsCount.Count}\tTicks: {minTreadsCount.Ticks}\t\tTicks in one tread: {totalTicksOne / tests}");
+Console.WriteLine($"The number of ticks for multithreads is {totalTicksOne / tests / minTreadsCount.Ticks} times less than for single streams");
+
+ScottPlot.Plot plt = new();
+plt.Add.Scatter(dataX, dataY);
+
+plt
+
+#!markdown
+
+## Summary
+
+**Выбранный шаг: 1e-4**
+
+**Оптимальное кол-во потоков: 10**     
+**Скорость (средняя): 37242 ticks; быстрее однопоточного вычисления на 83% (однопоточное (среднее): 219088 ticks)**
+
+**1000 TESTS**
+* Threads: 2	OneThread: 219088,92	MultiTreadTicksAVG: 122359,99
+* Threads: 3	OneThread: 219088,92	MultiTreadTicksAVG: 87415,05
+* Threads: 4	OneThread: 219088,92	MultiTreadTicksAVG: 70834,305
+* Threads: 5	OneThread: 219088,92	MultiTreadTicksAVG: 61483,703
+* Threads: 6	OneThread: 219088,92	MultiTreadTicksAVG: 56517,773
+* Threads: 7	OneThread: 219088,92	MultiTreadTicksAVG: 49394,49
+* Threads: 8	OneThread: 219088,92	MultiTreadTicksAVG: 43707,035
+* Threads: 9	OneThread: 219088,92	MultiTreadTicksAVG: 40408,68
+* Threads: 10	OneThread: 219088,92	MultiTreadTicksAVG: 37242,297
+* Threads: 11	OneThread: 219088,92	MultiTreadTicksAVG: 41159,36
+* Threads: 12	OneThread: 219088,92	MultiTreadTicksAVG: 50760,496
+* Threads: 13	OneThread: 219088,92	MultiTreadTicksAVG: 49343,82
+* Threads: 14	OneThread: 219088,92	MultiTreadTicksAVG: 47426,395
+* Threads: 15	OneThread: 219088,92	MultiTreadTicksAVG: 45277,53
+* Threads: 16	OneThread: 219088,92	MultiTreadTicksAVG: 42672,695
+* Threads: 17	OneThread: 219088,92	MultiTreadTicksAVG: 40784,98
+* Threads: 18	OneThread: 219088,92	MultiTreadTicksAVG: 38790,17
+* Threads: 19	OneThread: 219088,92	MultiTreadTicksAVG: 38156,566
+* Threads: 20	OneThread: 219088,92	MultiTreadTicksAVG: 36885,734
+* Threads: 21	OneThread: 219088,92	MultiTreadTicksAVG: 37855,46
+* Threads: 22	OneThread: 219088,92	MultiTreadTicksAVG: 38491,242
+* Threads: 23	OneThread: 219088,92	MultiTreadTicksAVG: 41626,027
+* Threads: 24	OneThread: 219088,92	MultiTreadTicksAVG: 50202,465
+* Threads: 25	OneThread: 219088,92	MultiTreadTicksAVG: 48667,63
+* Threads: 26	OneThread: 219088,92	MultiTreadTicksAVG: 48977,45
+
+![alt text](image.png)
