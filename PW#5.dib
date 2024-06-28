@@ -66,8 +66,8 @@ var queue2 = new BlockingCollection<Message>(2); //очередь второго
 queue1.Add(new Message());
 // queue2.Add(new Message());
 
-var ping = Task.Run(() => PingPong(queue2, queue1));
-var pong = Task.Run(() => PingPong(queue1, queue2));
+var ping = Task.Run(() => PingPong(queue1, queue2));
+var pong = Task.Run(() => PingPong(queue2, queue1));
 
 Task.WaitAll(ping, pong);
 
