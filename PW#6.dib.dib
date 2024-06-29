@@ -39,9 +39,12 @@
 
 #!csharp
 
+#r "nuget:ScottPlot, 5.0.35"
+
 using System.Threading;
 using System.Diagnostics;
 using System.Collections.Concurrent;
+using Microsoft.DotNet.Interactive.Formatting;
 
 Queue<string> unsafeQueue = new();
 BlockingCollection<string> blockColl = new();
@@ -50,6 +53,9 @@ ConcurrentQueue<string> queueSafe = new();
 static ManualResetEvent manualResetEvent = new(false);
 
 Stopwatch clock = new();
+
+Formatter.Register(typeof(ScottPlot.Plot), (p, w) => 
+    w.Write(((ScottPlot.Plot)p).GetImageHtml(1000, 800)), HtmlFormatter.MimeType);
 
 #!csharp
 
@@ -70,7 +76,12 @@ for (int k = 0; k < 10; k++)
     clock.Reset();
 }
 
-allTicks.Average()
+Console.WriteLine(allTicks.Average());
+
+ScottPlot.Plot plt = new();
+plt.Add.Scatter(allTicks, Enumerable.Range(1, 10));
+
+plt
 
 #!csharp
 
