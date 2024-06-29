@@ -30,7 +30,7 @@
 
 Сделать десять замеров по каждой коллекции. Все замеры показать на графике.
 
-Записать в ноутбуке вывод - какая и потоко-безопасных коллекций эффективнее. И выразить в процентах - скорость самой быстрой поток-безопасной коллекции по сравнению с обычной очредью.
+Записать в ноутбуке вывод - какая из потоко-безопасных коллекций эффективнее. И выразить в процентах - скорость самой быстрой поток-безопасной коллекции по сравнению с обычной очредью.
 
 **Указание**.
 1. Необходимо исключить из замеров время, необходимое для запуска и остановки потоков, то есть посчитать чистое время, необходимое для обработки объектов.
@@ -55,7 +55,7 @@ static ManualResetEvent manualResetEvent = new(false);
 Stopwatch clock = new();
 
 Formatter.Register(typeof(ScottPlot.Plot), (p, w) => 
-    w.Write(((ScottPlot.Plot)p).GetImageHtml(1000, 800)), HtmlFormatter.MimeType);
+    w.Write(((ScottPlot.Plot)p).GetImageHtml(1000, 400)), HtmlFormatter.MimeType);
 
 #!csharp
 
@@ -79,7 +79,7 @@ for (int k = 0; k < 10; k++)
 Console.WriteLine(allTicks.Average());
 
 ScottPlot.Plot plt = new();
-plt.Add.Scatter(allTicks, Enumerable.Range(1, 10));
+plt.Add.Scatter(allTicks, Enumerable.Range(1, 10).ToList());
 
 plt
 
@@ -112,7 +112,12 @@ for (int k = 0; k < 10; k++)
     clock.Reset();
 }
 
-allTicks.Average()
+Console.WriteLine(allTicks.Average());
+
+ScottPlot.Plot plt = new();
+plt.Add.Scatter(allTicks, Enumerable.Range(1, 10).ToList());
+
+plt
 
 #!csharp
 
@@ -143,14 +148,31 @@ for (int k = 0; k < 10; k++)
     clock.Reset();
 }
 
-allTicks.Average()
+Console.WriteLine(allTicks.Average());
 
-#!markdown
+ScottPlot.Plot plt = new();
+plt.Add.Scatter(allTicks, Enumerable.Range(1, 10).ToList());
 
-91801
-1459838
-68425
+plt
 
 #!markdown
 
 ## Вывод
+
+#!markdown
+
+Самой быстрой потокобезопасной коллекцией является **ConcurrentQueue**, она показала скорость, которая на **29%** выше скорости непотокобезопасной очереди.
+
+#!markdown
+
+**Среднее кол-во тиков, за которое происходит запись и чтение в непотокобезопасной очереди: 92293 ticks**
+
+![alt text](image.png)
+
+**Среднее кол-во тиков, за которое происходит запись и чтение в BlockingCollection: 1451006 ticks**
+
+![alt text](image-1.png)
+
+**Среднее кол-во тиков, за которое происходит запись и чтение в ConcurrentQueue: 65718 ticks**
+
+![alt text](image-2.png)
