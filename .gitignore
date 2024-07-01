@@ -4,8 +4,6 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 .config/
-omgtu-summer-practice-2-semestr.sln
-Tester/
 
 # User-specific files
 *.rsuser

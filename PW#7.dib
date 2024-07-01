@@ -13,14 +13,6 @@
 2. Останавливать потоки по запросу извне.
 
 ## Задание.
-Пусть операция задана интерфейсом
-
-#!csharp
-
-public interface ICommand
-{
-    void Execute();
-}
 
 #!markdown
 
@@ -39,86 +31,133 @@ ServerThread может менять свое поведение для обра
 
 Написать проверку, которая гарантирует правильное выполнение команд HardStop и SoftStop.
 
-#!csharp
-
-using System.Threading;
-using System.Collections.Concurrent;
+Пусть операция задана интерфейсом
 
 #!csharp
 
 public interface ICommand
 {
-    void Execute(ServerThread serverThread);
+    void Execute();
 }
+
+#!csharp
+
+using System.Collections.Concurrent;
+using System.Threading;
+
+#!csharp
 
 public class ServerThread
 {
-    ConcurrentQueue<ICommand> serverQueue = new();
-    bool isRunning = true;
-    bool needStopWithEmptyQueue = false;
+    BlockingCollection<ICommand> serverQueue = [];
+    bool needStop = false;
 
     public Thread Thread { get; private set; }
 
-    public ServerThread() => Thread = new Thread(RunServer);
-
-    private void RunServer()
+    public ServerThread()
     {
-        while (isRunning)
+        Thread = new(RunServer);
+        Thread.Start();
+    }
+
+    public void RunServer()
+    {
+        while (true)
         {
-            if (serverQueue.TryDequeue(out ICommand inputCommand))
+            if (needStop && serverQueue.Count == 0)
+                break;
+
+            ICommand command = serverQueue.Take();
+
+            try
             {
-                try
-                {
-                    inputCommand.Execute(this);
-                }
-                catch (Exception exception)
-                {
-                    Console.WriteLine($"Error: {exception.Message}");
-                    
-                    
-                }
+                command.Execute();
             }
-            else if (needStopWithEmptyQueue)
-                isRunning = false;            
+            catch (ThreadInterruptedException ex)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                break;
+            }
+
+            Thread.Sleep(1);
         }
     }
 
-    public void Stop() => isRunning = false;
+    public void AddCommand(ICommand command) => serverQueue.Add(command);
 
-    public void StopWithEmptyQueue() => needStopWithEmptyQueue = true;
-
-    public void AddCommand(ICommand command) => serverQueue.Enqueue(command);
+    public void StopWithEmpty() => needStop = true;
 }
 
 #!csharp
 
-public class HardStopCommand : ICommand
+public class HardStopCommand(ServerThread serverThread) : ICommand
 {
-    public void Execute(ServerThread serverThread)
+    ServerThread serverThread = serverThread;
+
+    public void Execute()
     {
-        if (Thread.CurrentThread != serverThread.Thread)
-            throw new Exception("HardStopError: The thread received for processing is not current!");
-        
-        serverThread.Stop();
+        if (serverThread.Thread != Thread.CurrentThread)
+            throw new Exception(
+                "HardStopError: The thread received for processing is not current!"
+            );
+
+        throw new ThreadInterruptedException();
     }
 }
 
-public class SoftStopCommand : ICommand
+public class SoftStopCommand(ServerThread serverThread) : ICommand
 {
-    public void Execute(ServerThread serverThread)
+    ServerThread serverThread = serverThread;
+
+    public void Execute()
     {
-        if (Thread.CurrentThread != serverThread.Thread)
-            throw new Exception("SoftStopError: The thread received for processing is not current!");
-        
-        serverThread.StopWithEmptyQueue();
+        if (serverThread.Thread != Thread.CurrentThread)
+            throw new Exception(
+                "SoftStopError: The thread received for processing is not current!"
+            );
+
+        serverThread.StopWithEmpty();
     }
 }
 
 #!csharp
 
-public static class ExceptionHandlere : ExceptionHandler
+public class TestCommand : ICommand
 {
-    public static void Handle(Exception exception, ICommand command){
-        Console.WriteLine("Exception " + exception + " caught while trying to execute next command: " + command.GetType().Name);
+    public void Execute()
+    {
+        Console.WriteLine("Do something...");
+
+        Thread.Sleep(500);
+
+        Console.WriteLine("Ready.\n");
     }
 }
+
+#!csharp
+
+ServerThread server1 = new();
+
+server1.AddCommand(new TestCommand());
+server1.AddCommand(new TestCommand());
+server1.AddCommand(new SoftStopCommand(server1));
+server1.AddCommand(new TestCommand());
+
+server1.Thread.Join();
+
+Console.WriteLine("Server1 stopped.\n");
+
+ServerThread server2 = new();
+
+server2.AddCommand(new TestCommand());
+server2.AddCommand(new TestCommand());
+server2.AddCommand(new HardStopCommand(server2));
+server2.AddCommand(new TestCommand());
+
+server2.Thread.Join();
+
+Console.WriteLine("Server2 stopped.\n");
