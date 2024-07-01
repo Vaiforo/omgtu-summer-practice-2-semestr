@@ -48,11 +48,25 @@ using System.Collections.Concurrent;
 
 public class HardStopCommand : ICommand
 {
-    ServerThread serverTread;
+    public ServerThread serverThread;
 
     public void Execute()
     {
+        if (serverThread.Thread == Thread.CurrentThread)
+            throw new Exception("HardStopError: The thread received for processing is not current!");
+    }
+}
+
+public class SoftStopCommand : ICommand
+{
+    public ServerThread serverThread;
+
+    public void Execute()
+    {
+        if (serverThread.Thread == Thread.CurrentThread)
+            throw new Exception("SoftStopError: The thread received for processing is not current!");
         
+        // serverThread.Stop();
     }
 }
 
@@ -61,8 +75,30 @@ public class HardStopCommand : ICommand
 public class ServerThread
 {
     ConcurrentQueue<ICommand> serverQueue = new();
+    bool isRunning = true;
 
     public Thread Thread { get; private set; }
 
-    
+    public ServerThread() => Thread = new(RunServer);
+
+    public void RunServer()
+    {
+        while (isRunning)
+        {
+            if (serverQueue.TryDequeue(out ICommand command))
+            {
+                command.Execute();
+            }
+            
+            Thread.Sleep(50);
+        }
+    }
+
+    public void Stop() => isRunning = false;
 }
+
+#!csharp
+
+ServerThread server = new();
+
+server.
