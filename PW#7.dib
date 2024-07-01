@@ -82,8 +82,6 @@ public class ServerThread
                 Console.WriteLine(ex.Message);
                 break;
             }
-
-            Thread.Sleep(1);
         }
     }
 
