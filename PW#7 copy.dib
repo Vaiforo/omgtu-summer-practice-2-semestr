@@ -46,79 +46,23 @@ using System.Collections.Concurrent;
 
 #!csharp
 
-public interface ICommand
+public class HardStopCommand : ICommand
 {
-    void Execute(ServerThread serverThread);
+    ServerThread serverTread;
+
+    public void Execute()
+    {
+        
+    }
 }
+
+#!csharp
 
 public class ServerThread
 {
     ConcurrentQueue<ICommand> serverQueue = new();
-    bool isRunning = true;
-    bool needStopWithEmptyQueue = false;
 
     public Thread Thread { get; private set; }
 
-    public ServerThread() => Thread = new Thread(RunServer);
-
-    private void RunServer()
-    {
-        while (isRunning)
-        {
-            if (serverQueue.TryDequeue(out ICommand inputCommand))
-            {
-                try
-                {
-                    inputCommand.Execute(this);
-                }
-                catch (Exception exception)
-                {
-                    Console.WriteLine($"Error: {exception.Message}");
-                    
-                    
-                }
-            }
-            else if (needStopWithEmptyQueue)
-                isRunning = false;            
-        }
-    }
-
-    public void Stop() => isRunning = false;
-
-    public void StopWithEmptyQueue() => needStopWithEmptyQueue = true;
-
-    public void AddCommand(ICommand command) => serverQueue.Enqueue(command);
-}
-
-#!csharp
-
-public class HardStopCommand : ICommand
-{
-    public void Execute(ServerThread serverThread)
-    {
-        if (Thread.CurrentThread != serverThread.Thread)
-            throw new Exception("HardStopError: The thread received for processing is not current!");
-        
-        serverThread.Stop();
-    }
-}
-
-public class SoftStopCommand : ICommand
-{
-    public void Execute(ServerThread serverThread)
-    {
-        if (Thread.CurrentThread != serverThread.Thread)
-            throw new Exception("SoftStopError: The thread received for processing is not current!");
-        
-        serverThread.StopWithEmptyQueue();
-    }
-}
-
-#!csharp
-
-public static class ExceptionHandlere : ExceptionHandler
-{
-    public static void Handle(Exception exception, ICommand command){
-        Console.WriteLine("Exception " + exception + " caught while trying to execute next command: " + command.GetType().Name);
-    }
+    
 }
