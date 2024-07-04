@@ -215,24 +215,24 @@ public class TestLongCommand(ServerThread serverThread, int counter) : ICommand
 
 ServerThread server1 = new();
 
-        server1.AddCommand(new TestCommand());
-        server1.AddCommand(new TestLongCommand(server1, 3));
-        server1.AddCommand(new TestCommand());
-        server1.AddCommand(new SoftStopCommand(server1));
-        server1.AddCommand(new TestCommand());
+server1.AddCommand(new TestCommand());
+server1.AddCommand(new TestLongCommand(server1, 3));
+server1.AddCommand(new TestCommand());
+server1.AddCommand(new SoftStopCommand(server1));
+server1.AddCommand(new TestCommand());
 
-        server1.Thread.Join();
+server1.Thread.Join();
 
-        Console.WriteLine("Server1 stopped.\n");
+Console.WriteLine("Server1 stopped.\n");
 
-        ServerThread server2 = new();
+ServerThread server2 = new();
 
-        server2.AddCommand(new TestCommand());
-        server2.AddCommand(new TestLongCommand(server2, 3));
-        server2.AddCommand(new TestCommand());
-        server2.AddCommand(new HardStopCommand(server2));
-        server2.AddCommand(new TestCommand());
+server2.AddCommand(new TestCommand());
+server2.AddCommand(new TestLongCommand(server2, 3));
+server2.AddCommand(new TestCommand());
+server2.AddCommand(new HardStopCommand(server2));
+server2.AddCommand(new TestCommand());
 
-        server2.Thread.Join();
+server2.Thread.Join();
 
-        Console.WriteLine("Server2 stopped.\n");
+Console.WriteLine("Server2 stopped.\n");
