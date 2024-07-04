@@ -33,15 +33,6 @@
 Чтобы избежать мертвой блокировки потока, необходимо ввести понятие Планировщика, который будет отвечать за выбор следующей длительной задачи для выполнения,
 а чтение из очереди оставить только для новых операций. 
 
-#!csharp
-
-public interface IScheduler
-{
-    bool HasCommand();
-    ICommand Select();
-    void Add(ICommand cmd);
-}
-
 #!markdown
 
 Необходимо реализовать поток, который способен реализоввывать длительные операции.
@@ -55,3 +46,193 @@ public interface IScheduler
 Необходимо учесть этот момент при реализации очереди.
 
 2. Для обеспечения справедливости стратегии планировщика в слабом смысле использовать стратегию Round Robbin (циклическую) для определения следующего потока на исполнение.
+
+#!csharp
+
+using System.Collections.Concurrent;
+using System.Threading;
+
+#!csharp
+
+public interface ICommand
+{
+    void Execute();
+}
+
+#!csharp
+
+public interface IScheduler
+{
+    bool HasCommand();
+    ICommand Select();
+    void Add(ICommand cmd);
+}
+
+#!csharp
+
+public class ExceptionHandler
+{
+    public static void Handle(Exception ex)
+    {
+        Console.WriteLine($"Exception message:\n\t{ex.Message}");
+    }
+}
+
+#!csharp
+
+public class Scheduler : IScheduler
+{
+    BlockingCollection<ICommand> schedulerQueue = [];
+
+    public bool HasCommand() => schedulerQueue.Count > 0;
+
+    public ICommand Select() => schedulerQueue.Take();
+
+    public void Add(ICommand cmd) => schedulerQueue.Add(cmd);
+}
+
+#!csharp
+
+public class ServerThread
+{
+    BlockingCollection<ICommand> serverQueue = [];
+    bool needStop = false;
+    public Scheduler scheduler;
+
+    public Thread Thread { get; private set; }
+
+    public ServerThread()
+    {
+        scheduler = new();
+        Thread = new(RunServer);
+        Thread.Start();
+    }
+
+    public void RunServer()
+    {
+        while (true)
+        {
+            if (needStop && serverQueue.Count == 0 && !scheduler.HasCommand())
+                break;
+
+            serverQueue.TryTake(out ICommand command);
+            if (command == null)
+                if (scheduler.HasCommand())
+                    command = scheduler.Select();
+                else
+                {
+                    Thread.Sleep(10);
+                    continue;
+                }
+
+            try
+            {
+                command.Execute();
+            }
+            catch (ThreadInterruptedException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                ExceptionHandler.Handle(ex);
+                break;
+            }
+        }
+    }
+
+    public void AddCommand(ICommand command) => serverQueue.Add(command);
+
+    public void StopWithEmpty() => needStop = true;
+}
+
+#!csharp
+
+public class HardStopCommand(ServerThread serverThread) : ICommand
+{
+    ServerThread serverThread = serverThread;
+
+    public void Execute()
+    {
+        if (serverThread.Thread != Thread.CurrentThread)
+            throw new Exception(
+                "HardStopError: The thread received for processing is not current!"
+            );
+
+        throw new ThreadInterruptedException();
+    }
+}
+
+public class SoftStopCommand(ServerThread serverThread) : ICommand
+{
+    ServerThread serverThread = serverThread;
+
+    public void Execute()
+    {
+        if (serverThread.Thread != Thread.CurrentThread)
+            throw new Exception(
+                "SoftStopError: The thread received for processing is not current!"
+            );
+
+        serverThread.StopWithEmpty();
+    }
+}
+
+#!csharp
+
+public class TestCommand : ICommand
+{
+    public void Execute()
+    {
+        Console.WriteLine("Do something...");
+
+        Thread.Sleep(500);
+
+        Console.WriteLine("Ready.");
+    }
+}
+
+public class TestLongCommand(ServerThread serverThread, int counter) : ICommand
+{
+    ServerThread serverThread = serverThread;
+    int counter = counter;
+
+    public void Execute()
+    {
+        if (counter == 0)
+            return;
+        counter--;
+
+        Console.WriteLine($"Do something: {counter} more times...");
+        Thread.Sleep(500);
+        Console.WriteLine("Ready.");
+
+        serverThread.scheduler.Add(this);
+    }
+}
+
+#!csharp
+
+ServerThread server1 = new();
+
+        server1.AddCommand(new TestCommand());
+        server1.AddCommand(new TestLongCommand(server1, 3));
+        server1.AddCommand(new TestCommand());
+        server1.AddCommand(new SoftStopCommand(server1));
+        server1.AddCommand(new TestCommand());
+
+        server1.Thread.Join();
+
+        Console.WriteLine("Server1 stopped.\n");
+
+        ServerThread server2 = new();
+
+        server2.AddCommand(new TestCommand());
+        server2.AddCommand(new TestLongCommand(server2, 3));
+        server2.AddCommand(new TestCommand());
+        server2.AddCommand(new HardStopCommand(server2));
+        server2.AddCommand(new TestCommand());
+
+        server2.Thread.Join();
+
+        Console.WriteLine("Server2 stopped.\n");
