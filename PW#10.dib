@@ -263,7 +263,7 @@ public class LongCommand(ServerThread serverThread, ICommand command, int counte
         if (messagesQueue.Count > 0)
         {
             Message message = messagesQueue.Dequeue();
-            Console.WriteLine($"Команда {message.id} получила сообщение: {message.Content}");
+            Console.WriteLine($"Command {message.id} received the message: {message.Content}");
         }
     }
 
