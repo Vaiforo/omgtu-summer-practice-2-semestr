@@ -30,17 +30,149 @@
 
 Сделать десять замеров по каждой коллекции. Все замеры показать на графике.
 
-Записать в ноутбуке вывод - какая и потоко-безопасных коллекций эффективнее. И выразить в процентах - скорость самой быстрой поток-безопасной коллекции по сравнению с обычной очредью.
+Записать в ноутбуке вывод - какая из потоко-безопасных коллекций эффективнее. И выразить в процентах - скорость самой быстрой поток-безопасной коллекции по сравнению с обычной очредью.
 
 **Указание**.
 1. Необходимо исключить из замеров время, необходимое для запуска и остановки потоков, то есть посчитать чистое время, необходимое для обработки объектов.
 Для этого следует использовать условные события, которые позволят убедиться, что оба потока запустились и готовы читать и писать объекты и только потом запускать таймер.
 2. Для итогового вывода сравнивать усредненные значения.
 
-#!markdown
+#!csharp
 
-// здесь писать код
+#r "nuget:ScottPlot, 5.0.35"
+
+using System.Threading;
+using System.Diagnostics;
+using System.Collections.Concurrent;
+using Microsoft.DotNet.Interactive.Formatting;
+
+Queue<string> unsafeQueue = new();
+BlockingCollection<string> blockColl = new();
+ConcurrentQueue<string> queueSafe = new();
+
+static ManualResetEvent manualResetEvent = new(false);
+
+Stopwatch clock = new();
+
+Formatter.Register(typeof(ScottPlot.Plot), (p, w) => 
+    w.Write(((ScottPlot.Plot)p).GetImageHtml(1000, 400)), HtmlFormatter.MimeType);
+
+#!csharp
+
+List<long> allTicks = new();
+
+for (int k = 0; k < 10; k++)
+{
+    clock.Start();
+    for (int i = 0; i < 1_000_000; i++)
+        unsafeQueue.Enqueue("_message_");
+
+    for (int i = 0; i < 1_000_000; i++)
+        unsafeQueue.Dequeue();
+
+    clock.Stop();
+
+    allTicks.Add(clock.ElapsedTicks);
+    clock.Reset();
+}
+
+Console.WriteLine(allTicks.Average());
+
+ScottPlot.Plot plt = new();
+plt.Add.Scatter(allTicks, Enumerable.Range(1, 10).ToList());
+
+plt
+
+#!csharp
+
+List<long> allTicks = new();
+
+for (int k = 0; k < 10; k++)
+{
+    Task writeData = Task.Run(() => {
+        manualResetEvent.WaitOne();
+        clock.Start();
+
+        for (int i = 0; i < 1_000_000; i++)
+            blockColl.Add("_message_");
+    });
+
+    Task readData = Task.Run(() => {
+        manualResetEvent.Set();
+        
+        for (int i = 0; i < 1_000_000; i++)
+            blockColl.Take();
+
+        clock.Stop();
+        allTicks.Add(clock.ElapsedTicks);
+    });
+
+    Task.WaitAll(writeData, readData);
+    manualResetEvent.Reset();
+    clock.Reset();
+}
+
+Console.WriteLine(allTicks.Average());
+
+ScottPlot.Plot plt = new();
+plt.Add.Scatter(allTicks, Enumerable.Range(1, 10).ToList());
+
+plt
+
+#!csharp
+
+List<long> allTicks = new();
+
+for (int k = 0; k < 10; k++)
+{
+    Task writeData = Task.Run(() => {
+        manualResetEvent.WaitOne();
+        clock.Start();
+
+        for (int i = 0; i < 1_000_000; i++)
+            queueSafe.Enqueue("_message_");
+    });
+
+    Task readData = Task.Run(() => {
+        manualResetEvent.Set();
+        
+        for (int i = 0; i < 1_000_000; i++)
+            queueSafe.TryDequeue(out string message);
+
+        clock.Stop();
+        allTicks.Add(clock.ElapsedTicks);
+    });
+
+    Task.WaitAll(writeData, readData);
+    manualResetEvent.Reset();
+    clock.Reset();
+}
+
+Console.WriteLine(allTicks.Average());
+
+ScottPlot.Plot plt = new();
+plt.Add.Scatter(allTicks, Enumerable.Range(1, 10).ToList());
+
+plt
 
 #!markdown
 
 ## Вывод
+
+#!markdown
+
+Самой быстрой потокобезопасной коллекцией является **ConcurrentQueue**, она показала скорость, которая на **29%** выше скорости непотокобезопасной очереди.
+
+#!markdown
+
+**Среднее кол-во тиков, за которое происходит запись и чтение в непотокобезопасной очереди: 92293 ticks**
+
+![alt text](image.png)
+
+**Среднее кол-во тиков, за которое происходит запись и чтение в BlockingCollection: 1451006 ticks**
+
+![alt text](image-1.png)
+
+**Среднее кол-во тиков, за которое происходит запись и чтение в ConcurrentQueue: 65718 ticks**
+
+![alt text](image-2.png)
