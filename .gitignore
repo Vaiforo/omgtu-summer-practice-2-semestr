@@ -3,6 +3,12 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Personal ignor
+omgtu-summer-practice-2-semestr.sln
+Tester/
+.idea/
+.config/
+
 # User-specific files
 *.rsuser
 *.suo
